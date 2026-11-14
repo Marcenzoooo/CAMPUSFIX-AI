@@ -1,0 +1,8 @@
+{
+  "name": "CAMPUSFIX AI",
+  "description": "Smart campus operations, AI Academic Mentor, issue triage, marketplace, smart classrooms, and student workspace platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

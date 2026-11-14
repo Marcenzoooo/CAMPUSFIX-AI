@@ -1,0 +1,216 @@
+{
+  "entities": {
+    "UserPublic": {
+      "title": "UserPublic",
+      "description": "Public campus directory profile without PII",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "role": { "type": "string", "enum": ["student", "faculty", "admin"] },
+        "department": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "year": { "type": "string", "maxLength": 32 },
+        "bio": { "type": "string", "maxLength": 300 },
+        "avatarUrl": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "role", "department", "updatedAt"]
+    },
+    "UserPrivate": {
+      "title": "UserPrivate",
+      "description": "Private PII and personal workspace preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 160 },
+        "campusId": { "type": "string", "maxLength": 40 },
+        "bookmarks": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "updatedAt"]
+    },
+    "Complaint": {
+      "title": "Complaint",
+      "description": "Smart campus issue or maintenance ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "description": { "type": "string", "minLength": 5, "maxLength": 2000 },
+        "category": { "type": "string", "enum": ["electrical", "hvac", "network", "plumbing", "safety", "av_equipment"] },
+        "building": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "room": { "type": "string", "maxLength": 40 },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "status": { "type": "string", "enum": ["open", "in_progress", "resolved"] },
+        "authorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "assignedTeam": { "type": "string", "maxLength": 80 },
+        "upvotes": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "category", "building", "priority", "status", "authorId", "authorName", "upvotes", "createdAt", "updatedAt"]
+    },
+    "Listing": {
+      "title": "Listing",
+      "description": "Campus Exchange student marketplace item",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "description": { "type": "string", "minLength": 5, "maxLength": 1500 },
+        "price": { "type": "number" },
+        "category": { "type": "string", "enum": ["electronics", "books", "lab_gear", "furniture", "cycles"] },
+        "condition": { "type": "string", "enum": ["like_new", "good", "fair"] },
+        "status": { "type": "string", "enum": ["available", "reserved", "sold"] },
+        "sellerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sellerName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "imageUrl": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "price", "category", "condition", "status", "sellerId", "sellerName", "createdAt", "updatedAt"]
+    },
+    "Notice": {
+      "title": "Notice",
+      "description": "Campus Connect notice or event",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "body": { "type": "string", "minLength": 5, "maxLength": 2000 },
+        "noticeType": { "type": "string", "enum": ["circular", "event", "academic", "maintenance"] },
+        "location": { "type": "string", "maxLength": 100 },
+        "eventDate": { "type": "string", "maxLength": 60 },
+        "organizerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "organizerName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "rsvpCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "body", "noticeType", "organizerId", "organizerName", "rsvpCount", "createdAt", "updatedAt"]
+    },
+    "Resource": {
+      "title": "Resource",
+      "description": "Academic Vault notes, textbooks, and PYQs",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "courseCode": { "type": "string", "minLength": 2, "maxLength": 24 },
+        "resourceType": { "type": "string", "enum": ["notes", "pyq", "book", "lab_manual"] },
+        "semester": { "type": "string", "maxLength": 32 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "uploaderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "uploaderName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "downloads": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "courseCode", "resourceType", "uploaderId", "uploaderName", "downloads", "createdAt", "updatedAt"]
+    },
+    "LostItem": {
+      "title": "LostItem",
+      "description": "Smart Lost and Found report",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "description": { "type": "string", "minLength": 5, "maxLength": 1000 },
+        "itemType": { "type": "string", "enum": ["lost", "found"] },
+        "location": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "category": { "type": "string", "enum": ["electronics", "id_card", "accessories", "books", "keys"] },
+        "status": { "type": "string", "enum": ["open", "matched", "claimed"] },
+        "reporterId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "reporterName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "itemType", "location", "category", "status", "reporterId", "reporterName", "createdAt", "updatedAt"]
+    },
+    "Opportunity": {
+      "title": "Opportunity",
+      "description": "Hackathons, volunteering, and internships",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "organization": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "oppType": { "type": "string", "enum": ["hackathon", "internship", "volunteering", "research"] },
+        "deadline": { "type": "string", "maxLength": 40 },
+        "reward": { "type": "string", "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 1500 },
+        "creatorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "applicantCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "organization", "oppType", "deadline", "creatorId", "applicantCount", "createdAt", "updatedAt"]
+    },
+    "MentorSession": {
+      "title": "MentorSession",
+      "description": "Saved AI Academic Mentor study session or bookmark",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "topic": { "type": "string", "maxLength": 80 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "summary", "createdAt", "updatedAt"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Student workspace personal study note",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "content": { "type": "string", "maxLength": 5000 },
+        "courseCode": { "type": "string", "maxLength": 24 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "content", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserPublic" },
+      "description": "Public campus directory profile"
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivate" },
+      "description": "Owner-only PII and bookmarks"
+    },
+    "/complaints/{complaintId}": {
+      "schema": { "$ref": "#/entities/Complaint" },
+      "description": "CampusFix infrastructure issue tickets"
+    },
+    "/listings/{listingId}": {
+      "schema": { "$ref": "#/entities/Listing" },
+      "description": "Campus Exchange marketplace listings"
+    },
+    "/notices/{noticeId}": {
+      "schema": { "$ref": "#/entities/Notice" },
+      "description": "Campus Connect notices and events"
+    },
+    "/resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/Resource" },
+      "description": "Academic Vault notes and PYQs"
+    },
+    "/lostItems/{itemId}": {
+      "schema": { "$ref": "#/entities/LostItem" },
+      "description": "Smart Lost & Found reports"
+    },
+    "/opportunities/{oppId}": {
+      "schema": { "$ref": "#/entities/Opportunity" },
+      "description": "Hackathons, volunteering, and internships"
+    },
+    "/mentorSessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/MentorSession" },
+      "description": "Saved AI Academic Mentor responses and notes"
+    },
+    "/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/Note" },
+      "description": "Student workspace personal notes"
+    }
+  }
+}

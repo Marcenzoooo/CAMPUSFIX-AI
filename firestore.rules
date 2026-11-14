@@ -1,0 +1,511 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && (
+        ('email_verified' in request.auth.token && request.auth.token.email_verified == true) ||
+        ('firebase' in request.auth.token && request.auth.token.firebase.sign_in_provider == 'google.com')
+      );
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser()
+        && ('email' in request.auth.token)
+        && request.auth.token.email == 'marcenzoo44@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isStaff() {
+      return isAdmin() || (
+        isVerifiedUser()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['faculty', 'admin']
+      );
+    }
+
+    function isOwner(uid) {
+      return isVerifiedUser() && request.auth.uid == uid;
+    }
+
+    // Validation Helpers (pure on `data`, no existing() or diff())
+    function isValidUserPublic(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'department', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'role', 'department', 'year', 'bio', 'avatarUrl', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80
+        && data.role in ['student', 'faculty', 'admin']
+        && data.department is string && data.department.size() >= 1 && data.department.size() <= 80
+        && (!('year' in data) || (data.year is string && data.year.size() <= 32))
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 300))
+        && (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivate(data) {
+      return data.keys().hasAll(['uid', 'email', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'campusId', 'bookmarks', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && (!('campusId' in data) || (data.campusId is string && data.campusId.size() <= 40))
+        && (!('bookmarks' in data) || (data.bookmarks is list && data.bookmarks.size() <= 100 && (data.bookmarks.size() == 0 || data.bookmarks[0] is string)))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidComplaint(data) {
+      return data.keys().hasAll(['title', 'description', 'category', 'building', 'priority', 'status', 'authorId', 'authorName', 'upvotes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'description', 'category', 'building', 'room', 'priority', 'status', 'authorId', 'authorName', 'assignedTeam', 'aiSuggestion', 'resolutionNotes', 'upvotes', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 140
+        && data.description is string && data.description.size() >= 5 && data.description.size() <= 2000
+        && data.category in ['electrical', 'hvac', 'network', 'plumbing', 'safety', 'av_equipment']
+        && data.building is string && data.building.size() >= 1 && data.building.size() <= 80
+        && (!('room' in data) || (data.room is string && data.room.size() <= 40))
+        && data.priority in ['low', 'medium', 'high', 'critical']
+        && data.status in ['open', 'in_progress', 'resolved']
+        && isValidId(data.authorId)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80
+        && (!('assignedTeam' in data) || (data.assignedTeam is string && data.assignedTeam.size() <= 80))
+        && (!('aiSuggestion' in data) || (data.aiSuggestion is string && data.aiSuggestion.size() <= 500))
+        && (!('resolutionNotes' in data) || (data.resolutionNotes is string && data.resolutionNotes.size() <= 500))
+        && data.upvotes is int && data.upvotes >= 0 && data.upvotes <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidListing(data) {
+      return data.keys().hasAll(['title', 'description', 'price', 'category', 'condition', 'status', 'sellerId', 'sellerName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'description', 'price', 'category', 'condition', 'status', 'sellerId', 'sellerName', 'imageUrl', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 120
+        && data.description is string && data.description.size() >= 5 && data.description.size() <= 1500
+        && (data.price is int || data.price is float) && data.price >= 0 && data.price <= 500000
+        && data.category in ['electronics', 'books', 'lab_gear', 'furniture', 'cycles']
+        && data.condition in ['like_new', 'good', 'fair']
+        && data.status in ['available', 'reserved', 'sold']
+        && isValidId(data.sellerId)
+        && data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 80
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidNotice(data) {
+      return data.keys().hasAll(['title', 'body', 'noticeType', 'status', 'organizerId', 'organizerName', 'rsvpCount', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'body', 'noticeType', 'status', 'location', 'eventDate', 'organizerId', 'organizerName', 'rsvpCount', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 140
+        && data.body is string && data.body.size() >= 5 && data.body.size() <= 2000
+        && data.noticeType in ['circular', 'event', 'academic', 'maintenance']
+        && data.status in ['active', 'archived']
+        && (!('location' in data) || (data.location is string && data.location.size() <= 100))
+        && (!('eventDate' in data) || (data.eventDate is string && data.eventDate.size() <= 60))
+        && isValidId(data.organizerId)
+        && data.organizerName is string && data.organizerName.size() >= 1 && data.organizerName.size() <= 80
+        && data.rsvpCount is int && data.rsvpCount >= 0 && data.rsvpCount <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidResource(data) {
+      return data.keys().hasAll(['title', 'courseCode', 'resourceType', 'status', 'uploaderId', 'uploaderName', 'downloads', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'courseCode', 'resourceType', 'status', 'semester', 'description', 'uploaderId', 'uploaderName', 'downloads', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 140
+        && data.courseCode is string && data.courseCode.size() >= 2 && data.courseCode.size() <= 24
+        && data.resourceType in ['notes', 'pyq', 'book', 'lab_manual']
+        && data.status in ['active', 'archived']
+        && (!('semester' in data) || (data.semester is string && data.semester.size() <= 32))
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
+        && isValidId(data.uploaderId)
+        && data.uploaderName is string && data.uploaderName.size() >= 1 && data.uploaderName.size() <= 80
+        && data.downloads is int && data.downloads >= 0 && data.downloads <= 1000000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidLostItem(data) {
+      return data.keys().hasAll(['title', 'description', 'itemType', 'location', 'category', 'status', 'reporterId', 'reporterName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'description', 'itemType', 'location', 'category', 'status', 'reporterId', 'reporterName', 'imageUrl', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 120
+        && data.description is string && data.description.size() >= 5 && data.description.size() <= 1000
+        && data.itemType in ['lost', 'found']
+        && data.location is string && data.location.size() >= 2 && data.location.size() <= 100
+        && data.category in ['electronics', 'id_card', 'accessories', 'books', 'keys']
+        && data.status in ['open', 'matched', 'claimed']
+        && isValidId(data.reporterId)
+        && data.reporterName is string && data.reporterName.size() >= 1 && data.reporterName.size() <= 80
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOpportunity(data) {
+      return data.keys().hasAll(['title', 'organization', 'oppType', 'status', 'deadline', 'creatorId', 'applicantCount', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'organization', 'oppType', 'status', 'deadline', 'reward', 'description', 'creatorId', 'applicantCount', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 140
+        && data.organization is string && data.organization.size() >= 2 && data.organization.size() <= 100
+        && data.oppType in ['hackathon', 'internship', 'volunteering', 'research']
+        && data.status in ['active', 'closed']
+        && data.deadline is string && data.deadline.size() >= 2 && data.deadline.size() <= 40
+        && (!('reward' in data) || (data.reward is string && data.reward.size() <= 80))
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1500))
+        && isValidId(data.creatorId)
+        && data.applicantCount is int && data.applicantCount >= 0 && data.applicantCount <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMentorSession(data) {
+      return data.keys().hasAll(['userId', 'title', 'summary', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'title', 'summary', 'topic', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 120
+        && data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 4000
+        && (!('topic' in data) || (data.topic is string && data.topic.size() <= 80))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll(['userId', 'title', 'content', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'title', 'content', 'courseCode', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 120
+        && data.content is string && data.content.size() <= 5000
+        && (!('courseCode' in data) || (data.courseCode is string && data.courseCode.size() <= 24))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Admin registry
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
+      allow create, update, delete: if isValidId(adminId) && isBootstrappedAdmin();
+    }
+
+    // Public directory profiles (no PII)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (
+        (isSignedIn() && request.auth.uid == userId) ||
+        isAdmin() ||
+        (isSignedIn() && resource != null && resource.data.role in ['student', 'faculty', 'admin'])
+      );
+      allow list: if isSignedIn() && resource.data.role in ['student', 'faculty', 'admin'];
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserPublic(incoming())
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (incoming().role == 'student' || isAdmin());
+      allow update: if isValidId(userId)
+        && isVerifiedUser()
+        && isValidUserPublic(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isOwner(userId)
+            && incoming().role == existing().role
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'department', 'year', 'bio', 'avatarUrl', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(docId)
+          && isOwner(userId)
+          && isValidUserPrivate(incoming())
+          && incoming().uid == request.auth.uid
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(docId)
+          && isOwner(userId)
+          && isValidUserPrivate(incoming())
+          && incoming().uid == existing().uid
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'campusId', 'bookmarks', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(docId) && isAdmin();
+      }
+    }
+
+    // CampusFix Complaints
+    match /complaints/{complaintId} {
+      allow get: if isValidId(complaintId) && isSignedIn() && (resource == null || resource.data.status in ['open', 'in_progress', 'resolved']);
+      allow list: if isSignedIn() && resource.data.status in ['open', 'in_progress', 'resolved'];
+      allow create: if isValidId(complaintId)
+        && isVerifiedUser()
+        && isValidComplaint(incoming())
+        && incoming().authorId == request.auth.uid
+        && incoming().status == 'open'
+        && incoming().upvotes == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(complaintId)
+        && isVerifiedUser()
+        && isValidComplaint(incoming())
+        && incoming().authorId == existing().authorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isStaff()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assignedTeam', 'resolutionNotes', 'updatedAt'])
+          ) ||
+          (
+            existing().status != 'resolved' && (
+              (
+                incoming().authorId == request.auth.uid
+                && incoming().status == existing().status
+                && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'room', 'updatedAt'])
+              ) ||
+              (
+                incoming().upvotes == existing().upvotes + 1
+                && incoming().diff(existing()).affectedKeys().hasOnly(['upvotes', 'updatedAt'])
+              )
+            )
+          )
+        );
+      allow delete: if isValidId(complaintId) && isAdmin();
+    }
+
+    // Campus Exchange Listings
+    match /listings/{listingId} {
+      allow get: if isValidId(listingId) && isSignedIn() && (resource == null || resource.data.status in ['available', 'reserved', 'sold']);
+      allow list: if isSignedIn() && resource.data.status in ['available', 'reserved', 'sold'];
+      allow create: if isValidId(listingId)
+        && isVerifiedUser()
+        && isValidListing(incoming())
+        && incoming().sellerId == request.auth.uid
+        && incoming().status == 'available'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(listingId)
+        && isVerifiedUser()
+        && isValidListing(incoming())
+        && incoming().sellerId == existing().sellerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().status != 'sold' && (
+              (
+                existing().sellerId == request.auth.uid
+                && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'price', 'condition', 'status', 'updatedAt'])
+              ) ||
+              (
+                existing().status == 'available'
+                && incoming().status == 'reserved'
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+              )
+            )
+          )
+        );
+      allow delete: if isValidId(listingId) && (isAdmin() || (isVerifiedUser() && existing().sellerId == request.auth.uid));
+    }
+
+    // Campus Connect Notices & Events
+    match /notices/{noticeId} {
+      allow get: if isValidId(noticeId) && isSignedIn() && (resource == null || resource.data.status in ['active', 'archived']);
+      allow list: if isSignedIn() && resource.data.status in ['active', 'archived'];
+      allow create: if isValidId(noticeId)
+        && isVerifiedUser()
+        && isValidNotice(incoming())
+        && incoming().organizerId == request.auth.uid
+        && incoming().status == 'active'
+        && incoming().rsvpCount == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(noticeId)
+        && isVerifiedUser()
+        && isValidNotice(incoming())
+        && incoming().organizerId == existing().organizerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().status == 'active' && (
+              (
+                existing().organizerId == request.auth.uid
+                && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'body', 'location', 'eventDate', 'status', 'updatedAt'])
+              ) ||
+              (
+                incoming().rsvpCount == existing().rsvpCount + 1
+                && incoming().diff(existing()).affectedKeys().hasOnly(['rsvpCount', 'updatedAt'])
+              )
+            )
+          )
+        );
+      allow delete: if isValidId(noticeId) && isAdmin();
+    }
+
+    // Academic Vault Resources
+    match /resources/{resourceId} {
+      allow get: if isValidId(resourceId) && isSignedIn() && (resource == null || resource.data.status in ['active', 'archived']);
+      allow list: if isSignedIn() && resource.data.status in ['active', 'archived'];
+      allow create: if isValidId(resourceId)
+        && isVerifiedUser()
+        && isValidResource(incoming())
+        && incoming().uploaderId == request.auth.uid
+        && incoming().status == 'active'
+        && incoming().downloads == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(resourceId)
+        && isVerifiedUser()
+        && isValidResource(incoming())
+        && incoming().uploaderId == existing().uploaderId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().status == 'active'
+            && incoming().downloads == existing().downloads + 1
+            && incoming().diff(existing()).affectedKeys().hasOnly(['downloads', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(resourceId) && (isAdmin() || (isVerifiedUser() && existing().uploaderId == request.auth.uid));
+    }
+
+    // Smart Lost & Found
+    match /lostItems/{itemId} {
+      allow get: if isValidId(itemId) && isSignedIn() && (resource == null || resource.data.status in ['open', 'matched', 'claimed']);
+      allow list: if isSignedIn() && resource.data.status in ['open', 'matched', 'claimed'];
+      allow create: if isValidId(itemId)
+        && isVerifiedUser()
+        && isValidLostItem(incoming())
+        && incoming().reporterId == request.auth.uid
+        && incoming().status == 'open'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(itemId)
+        && isVerifiedUser()
+        && isValidLostItem(incoming())
+        && incoming().reporterId == existing().reporterId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().status != 'claimed' && (
+              (
+                isStaff()
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+              ) ||
+              (
+                existing().reporterId == request.auth.uid
+                && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'location', 'status', 'updatedAt'])
+              ) ||
+              (
+                existing().status in ['open', 'matched']
+                && incoming().status in ['matched', 'claimed']
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+              )
+            )
+          )
+        );
+      allow delete: if isValidId(itemId) && (isAdmin() || (isVerifiedUser() && existing().reporterId == request.auth.uid));
+    }
+
+    // Community & Opportunities
+    match /opportunities/{oppId} {
+      allow get: if isValidId(oppId) && isSignedIn() && (resource == null || resource.data.status in ['active', 'closed']);
+      allow list: if isSignedIn() && resource.data.status in ['active', 'closed'];
+      allow create: if isValidId(oppId)
+        && isVerifiedUser()
+        && isValidOpportunity(incoming())
+        && incoming().creatorId == request.auth.uid
+        && incoming().status == 'active'
+        && incoming().applicantCount == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(oppId)
+        && isVerifiedUser()
+        && isValidOpportunity(incoming())
+        && incoming().creatorId == existing().creatorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().status == 'active'
+            && incoming().applicantCount == existing().applicantCount + 1
+            && incoming().diff(existing()).affectedKeys().hasOnly(['applicantCount', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(oppId) && isAdmin();
+    }
+
+    // Personal Mentor Sessions
+    match /mentorSessions/{sessionId} {
+      allow get: if isValidId(sessionId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isValidId(sessionId)
+        && isVerifiedUser()
+        && isValidMentorSession(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(sessionId)
+        && isVerifiedUser()
+        && isValidMentorSession(incoming())
+        && incoming().userId == existing().userId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'summary', 'topic', 'updatedAt']);
+      allow delete: if isValidId(sessionId) && isVerifiedUser() && existing().userId == request.auth.uid;
+    }
+
+    // Student Workspace Personal Notes
+    match /notes/{noteId} {
+      allow get: if isValidId(noteId) && isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isValidId(noteId)
+        && isVerifiedUser()
+        && isValidNote(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(noteId)
+        && isVerifiedUser()
+        && isValidNote(incoming())
+        && incoming().userId == existing().userId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'courseCode', 'updatedAt']);
+      allow delete: if isValidId(noteId) && isVerifiedUser() && existing().userId == request.auth.uid;
+    }
+  }
+}

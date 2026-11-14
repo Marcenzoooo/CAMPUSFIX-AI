@@ -1,0 +1,174 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #F8F6F7;
+    color: #19171D;
+  }
+
+  html.dark body {
+    background-color: #141218;
+    color: #F5F3F6;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-mono-num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid #E84D96;
+    outline-offset: 2px;
+  }
+}
+
+@keyframes campus-gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.text-campus-gradient {
+  background: linear-gradient(120deg, #E84D96 0%, #B83272 32%, #C58A32 68%, #E84D96 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: campus-gradient-shift 7s ease infinite;
+}
+
+.dark .text-campus-gradient {
+  background: linear-gradient(120deg, #FF70B5 0%, #E84D96 36%, #E5AC53 72%, #FF70B5 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes nova-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes nova-blink {
+  0%, 92%, 100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes nova-pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.65;
+  }
+  70% {
+    transform: scale(1.12);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.12);
+    opacity: 0;
+  }
+}
+
+@keyframes nova-wave {
+  0%, 100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.animate-nova-float {
+  animation: nova-float 4s ease-in-out infinite;
+}
+
+.animate-nova-blink {
+  transform-origin: center;
+  animation: nova-blink 5.2s ease-in-out infinite;
+}
+
+.animate-nova-ring {
+  animation: nova-pulse-ring 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.animate-nova-wave-1 {
+  animation: nova-wave 0.65s ease-in-out infinite;
+}
+.animate-nova-wave-2 {
+  animation: nova-wave 0.65s ease-in-out 0.15s infinite;
+}
+.animate-nova-wave-3 {
+  animation: nova-wave 0.65s ease-in-out 0.3s infinite;
+}
+
+@keyframes network-flow {
+  0% {
+    stroke-dashoffset: 28;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes auth-float-slow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-network-flow {
+  stroke-dasharray: 6 8;
+  animation: network-flow 2.4s linear infinite;
+}
+
+.animate-auth-float {
+  animation: auth-float-slow 5.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .text-campus-gradient,
+  .animate-nova-float,
+  .animate-nova-blink,
+  .animate-nova-ring,
+  .animate-nova-wave-1,
+  .animate-nova-wave-2,
+  .animate-nova-wave-3,
+  .animate-network-flow,
+  .animate-auth-float {
+    animation: none !important;
+  }
+}
